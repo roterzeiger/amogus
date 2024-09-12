@@ -3,224 +3,358 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roter Zeiger - Das Spiel (3D Labyrinth)</title>
+    <title>Hatte Langeweile</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
-        #scoreboard {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            font-size: 20px;
-            z-index: 1;
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
         }
+
+        main {
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            max-width: 90%;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 10px;
+            z-index: 1; /* Stelle sicher, dass der Inhalt über dem Hintergrund liegt */
+        }
+
+        h2 {
+            margin-bottom: 10px;
+            font-size: 24px;
+            color: #007bff; /* Blau für "Sinn der Website" */
+        }
+
+        p {
+            margin-top: 0;
+            font-size: 18px;
+        }
+
+        .altButton {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: #ffffff;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+        }
+
+        .altButton:hover {
+            opacity: 0.9;
+        }
+
+        #gifImage {
+            margin-top: 15px;
+            display: none;
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+
+        #successMessage {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #ffcc00;
+        }
+
+        #pongGame {
+            display: none;
+            margin-top: 20px;
+            background-color: #000000;
+            border: 2px solid #ffcc00;
+        }
+
+        #visitorCount {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: #ffcc00;
+            color: #000000;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        @media (max-width: 600px) {
+            h2 {
+                font-size: 22px;
+            }
+
+            p, .altButton {
+                font-size: 16px;
+            }
+
+            #pongGame {
+                width: 100%;
+                height: auto;
+            }
+        }
+
+        /* Game Over Screen */
+        #gameOverScreen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            text-align: center;
+            padding-top: 20%;
+            font-size: 24px;
+            z-index: 10;
+        }
+
+        /* Galaxy Background */
+        #galaxy {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(8,10,38,1) 0%, rgba(2,2,34,1) 100%);
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        /* Sterne Styling und Animation */
+        .star {
+            position: absolute;
+            background-color: white;
+            border-radius: 50%;
+            opacity: 0.8;
+            animation: twinkling 2s infinite ease-in-out alternate, moveStars 20s linear infinite;
+        }
+
+        @keyframes twinkling {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes moveStars {
+            from { transform: translateY(0); }
+            to { transform: translateY(-100vh); }
+        }
+
     </style>
 </head>
 <body>
-    <div id="scoreboard">Finde die Kekse und drücke 'E', um sie aufzuheben!</div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <div id="galaxy"></div> <!-- Galaxy-Hintergrund -->
+
+    <main>
+        <h2>Sinn der Website</h2> <!-- Jetzt in Blau -->
+        <p>Ich hatte Langeweile</p>
+        <p>The FitnessGram™ Pacer Test is a multistage aerobic capacity test that progressively gets more difficult as it continues...</p>
+
+        <button id="startPongButton" class="altButton" style="display: none;" onclick="startPongGame()">Starte Pong Spiel</button>
+        <!-- Entfernte den GIF-Button -->
+
+        <img id="gifImage" src="https://media.giphy.com/media/l4FGn8Asi6rrg5wVy/giphy.gif" alt="HAHA Funny gif">
+
+        <p id="successMessage" style="display: none;">Beta Ende: Vollversion kommt am 31.8.2024</p>
+        <input class="altButton" type="text" id="textInput" placeholder="Gib hier deinen Text ein" style="display: none;">
+
+        <canvas id="pongGame" width="600" height="400"></canvas>
+        <div id="visitorCount">Aktuelle Besucher: 0</div>
+        <div id="gameOverScreen">Game Over</div>
+    </main>
+
     <script>
-        let camera, scene, renderer, controls;
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
-        let objects = [];
-        let raycaster;
-        let collectedCookies = 0;
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-        let prevTime = performance.now();
+        // Galaxy Background with Stars Animation
+        function createStars() {
+            const starCount = 150; // Anzahl der Sterne
+            const galaxy = document.getElementById("galaxy");
 
-        init();
-        animate();
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement("div");
+                star.classList.add("star");
 
-        function init() {
-            // Szene und Kamera
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87ceeb); // Himmelblauer Hintergrund
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-            camera.position.set(0, 4, 20); // Kamera initial weiter entfernt positionieren
+                // Zufällige Position und Größe für die Sterne
+                const size = Math.random() * 3 + 1 + "px";
+                const top = Math.random() * 100 + "%";
+                const left = Math.random() * 100 + "%";
+                const delay = Math.random() * 2 + "s"; // Zufällige Verzögerung für das Funkeln
+                const duration = Math.random() * 5 + 10 + "s"; // Verschiedene Geschwindigkeiten für die Bewegung der Sterne
 
-            // Beleuchtung
-            const ambientLight = new THREE.AmbientLight(0x404040); // Sanftes Umgebungslicht
-            scene.add(ambientLight);
+                star.style.width = size;
+                star.style.height = size;
+                star.style.top = top;
+                star.style.left = left;
+                star.style.animationDelay = delay;
+                star.style.animationDuration = duration;
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Stärkeres Licht
-            directionalLight.position.set(1, 1, 1).normalize();
-            scene.add(directionalLight);
-
-            // PointerLockControls für First-Person-Steuerung
-            controls = new THREE.PointerLockControls(camera, document.body);
-            document.addEventListener('click', () => {
-                controls.lock();
-            });
-            scene.add(controls.getObject());
-
-            // Boden
-            const floorGeometry = new THREE.PlaneGeometry(800, 800);
-            const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-            floor.rotation.x = -Math.PI / 2;
-            scene.add(floor);
-
-            // Wände
-            const wallGeometry = new THREE.BoxGeometry(8, 8, 8);
-            const wallMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-
-            function addWall(x, z) {
-                const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                wall.position.set(x, 4, z);
-                scene.add(wall);
-                objects.push(wall);
+                galaxy.appendChild(star);
             }
-
-            // Einfaches Labyrinth
-            addWall(0, 0);
-            addWall(10, 0);
-            addWall(0, 10);
-            addWall(10, 10);
-
-            // Kekse
-            const cookieGeometry = new THREE.CylinderGeometry(1.5, 1.5, 0.5, 32);
-            const cookieMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-
-            function addCookie(x, z) {
-                const cookie = new THREE.Mesh(cookieGeometry, cookieMaterial);
-                cookie.position.set(x, 1, z);
-                scene.add(cookie);
-                objects.push(cookie);
-            }
-
-            addCookie(5, 5);
-
-            // Raycaster für Kollisionserkennung
-            raycaster = new THREE.Raycaster();
-
-            // Renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            // Bewegungsevents
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
         }
 
-        function detectCollision() {
-            raycaster.ray.origin.copy(camera.position);
-            raycaster.ray.direction.set(0, -1, 0); // Nach unten strahlen
+        createStars(); // Rufe die Funktion auf, um die Sterne zu erstellen
 
-            const intersects = raycaster.intersectObjects(objects);
-            for (const object of intersects) {
-                if (object.object.geometry instanceof THREE.BoxGeometry) {
-                    return true;
-                }
+        let canvas, ctx;
+        const paddleWidth = 10;
+        const paddleHeight = 100;
+        const paddleSpeed = 4;
+        const ballSize = 10;
+        let playerPaddleY = 0;
+        let computerPaddleY = 0;
+        let ballX, ballY, ballSpeedX, ballSpeedY;
+        let gameOver = false;
+        let keysPressed = {};
+        let ws;
+
+        document.addEventListener("keydown", (event) => {
+            keysPressed[event.key] = true;
+
+            // Handle Pong game activation
+            if (keysPressed['2'] && keysPressed['5'] && keysPressed['8']) {
+                document.getElementById("startPongButton").style.display = "block";
+                keysPressed = {};
             }
-            return false;
-        }
 
-        function collectCookies() {
-            raycaster.ray.origin.copy(camera.position);
-            raycaster.ray.origin.y -= 4; // Spielerhöhe anpassen
-            raycaster.ray.direction.set(0, -1, 0); // Nach unten strahlen
+            // Handle visitor count display
+            if (keysPressed['t'] && keysPressed['u'] && keysPressed['o']) {
+                document.getElementById("visitorCount").style.display = "block";
+                fetchVisitorCount();
+                keysPressed = {};
+            }
 
-            const intersects = raycaster.intersectObjects(objects);
+            // Show/hide the gif
+            if (event.key === "a") {
+                document.getElementById("gifImage").style.display = "block";
+            }
 
-            if (intersects.length > 0) {
-                const object = intersects[0].object;
+            // Toggle fullscreen mode
+            if (event.key === "f") {
+                toggleFullScreen();
+            }
 
-                if (object.geometry instanceof THREE.CylinderGeometry) {
-                    scene.remove(object);
-                    objects = objects.filter(obj => obj !== object);
-                    collectedCookies++;
-                    document.getElementById('scoreboard').innerText = `Kekse gesammelt: ${collectedCookies}`;
+            // Open THINK FAST
+            if (keysPressed['f'] && keysPressed['h'] && keysPressed['b']) {
+                window.open("https://www.youtube.com/watch?v=pwTzHbIXSlI", "_blank");
+                keysPressed = {};
+            }
+
+            // Open AMOGUS
+            if (keysPressed['a'] && keysPressed['u'] && keysPressed['s']) {
+                window.open("https://roterzeiger.github.io/amogus/", "_blank");
+                keysPressed = {};
+            }
+            // Open aughhhh
+            if (keysPressed['b'] && keysPressed['a'] && keysPressed['m']) {
+                window.open("https://roterzeiger.github.io/amogus/think.mp4", "_blank");
+                keysPressed = {};
+            }
+        });
+
+        // Fullscreen toggle function
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
                 }
             }
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
-
-            if (controls.isLocked) {
-                const time = performance.now();
-                const delta = (time - prevTime) / 1000;
-
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
-
-                direction.z = Number(moveForward) - Number(moveBackward);
-                direction.x = Number(moveRight) - Number(moveLeft);
-                direction.normalize();
-
-                // Temporäre Position berechnen
-                const tempPosition = camera.position.clone();
-                if (moveForward || moveBackward) tempPosition.z -= direction.z * 200.0 * delta;
-                if (moveLeft || moveRight) tempPosition.x -= direction.x * 200.0 * delta;
-
-                // Überprüfe Kollision vor der tatsächlichen Bewegung
-                if (!detectCollision()) {
-                    controls.moveRight(-velocity.x * delta);
-                    controls.moveForward(-velocity.z * delta);
-                }
-
-                prevTime = time;
-            }
-
-            renderer.render(scene, camera);
+        function startPongGame() {
+            canvas = document.getElementById("pongGame");
+            ctx = canvas.getContext("2d");
+            playerPaddleY = canvas.height / 2 - paddleHeight / 2;
+            computerPaddleY = canvas.height / 2 - paddleHeight / 2;
+            ballX = canvas.width / 2;
+            ballY = canvas.height / 2;
+            ballSpeedX = 3;
+            ballSpeedY = 3;
+            gameOver = false;
+            document.getElementById("pongGame").style.display = "block";
+            document.getElementById("gameOverScreen").style.display = "none";
+            gameLoop();
         }
 
-        function onKeyDown(event) {
-            switch (event.code) {
-                case 'ArrowUp':
-                case 'KeyW':
-                    moveForward = true;
-                    break;
-                case 'ArrowLeft':
-                case 'KeyA':
-                    moveLeft = true;
-                    break;
-                case 'ArrowDown':
-                case 'KeyS':
-                    moveBackward = true;
-                    break;
-                case 'ArrowRight':
-                case 'KeyD':
-                    moveRight = true;
-                    break;
-                case 'KeyE':
-                    collectCookies();
-                    break;
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "white";
+
+            // Player paddle
+            ctx.fillRect(0, playerPaddleY, paddleWidth, paddleHeight);
+
+            // Computer paddle
+            ctx.fillRect(canvas.width - paddleWidth, computerPaddleY, paddleWidth, paddleHeight);
+
+            // Ball
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function update() {
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+
+            // Ball collision with top/bottom walls
+            if (ballY + ballSize > canvas.height || ballY - ballSize < 0) {
+                ballSpeedY = -ballSpeedY;
+            }
+
+            // Ball out of bounds
+            if (ballX + ballSize > canvas.width || ballX - ballSize < 0) {
+                gameOver = true;
+                document.getElementById("gameOverScreen").style.display = "block";
+                document.getElementById("pongGame").style.display = "none";
+            }
+
+            // Ball collision with paddles
+            if (
+                ballX - ballSize < paddleWidth &&
+                ballY > playerPaddleY &&
+                ballY < playerPaddleY + paddleHeight
+            ) {
+                ballSpeedX = -ballSpeedX;
+            } else if (
+                ballX + ballSize > canvas.width - paddleWidth &&
+                ballY > computerPaddleY &&
+                ballY < computerPaddleY + paddleHeight
+            ) {
+                ballSpeedX = -ballSpeedX;
+            }
+
+            // Simple computer AI
+            if (computerPaddleY + paddleHeight / 2 < ballY) {
+                computerPaddleY += paddleSpeed;
+            } else if (computerPaddleY + paddleHeight / 2 > ballY) {
+                computerPaddleY -= paddleSpeed;
             }
         }
 
-        function onKeyUp(event) {
-            switch (event.code) {
-                case 'ArrowUp':
-                case 'KeyW':
-                    moveForward = false;
-                    break;
-                case 'ArrowLeft':
-                case 'KeyA':
-                    moveLeft = false;
-                    break;
-                case 'ArrowDown':
-                case 'KeyS':
-                    moveBackward = false;
-                    break;
-                case 'ArrowRight':
-                case 'KeyD':
-                    moveRight = false;
-                    break;
+        function gameLoop() {
+            if (!gameOver) {
+                draw();
+                update();
+                requestAnimationFrame(gameLoop);
             }
+        }
+
+        function fetchVisitorCount() {
+            fetch('https://example.com/visitor-count')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("visitorCount").textContent = `Aktuelle Besucher: ${data.count}`;
+                })
+                .catch(error => console.error('Fehler beim Abrufen der Besucheranzahl:', error));
         }
     </script>
 </body>
